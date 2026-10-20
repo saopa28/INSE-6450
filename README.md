@@ -5,13 +5,8 @@ Version control for our group project.
 ## Project overview
 This repository contains a Google Colab/Jupyter notebook for exploratory data analysis on the Criteo uplift dataset. The notebook loads the dataset directly from Hugging Face and performs EDA with [...]
 
-## Links
-- https://github.com/saopa28/INSE-6450/releases/tag/v1.0-engineered
+## Google Colab notebook
 - https://colab.research.google.com/drive/1gKct2Ir_g3hEOOPjexrCBOU7skpkdSPB?usp=sharing
-
-## Output artifact
-The output artifact for this project is published on GitHub Releases:
-- https://github.com/saopa28/INSE-6450/releases/tag/v1.0-engineered
 
 ## Dependencies
 Install the required Python packages before running the notebook:
@@ -41,9 +36,6 @@ jupyter notebook INSE6450.ipynb
 ```
 
 Then open `INSE6450.ipynb` in Jupyter and execute the cells.
-
-## Output location
-This project does not currently save generated results into a repository folder. The notebook reads the dataset from Hugging Face and displays analysis output directly in the notebook environment [...]
 
 ## Notes
 - The dataset used by the notebook is large (approximately 14 million rows, 16 columns).
