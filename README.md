@@ -3,10 +3,14 @@
 Version control for our group project.
 
 ## Project overview
-This repository contains a Google Colab/Jupyter notebook for exploratory data analysis on the Criteo uplift dataset. The notebook loads the dataset directly from Hugging Face and performs EDA with [...]
+This repository contains a Google Colab/Jupyter notebook for exploratory data analysis on the Criteo uplift dataset. The notebook loads the dataset directly from Hugging Face and performs EDA to inspect data distributions, identify missing values, summarize feature behavior, and evaluate uplift-related patterns that support downstream modeling and analysis.
 
 ## Google Colab Notebook
 - https://colab.research.google.com/drive/1gKct2Ir_g3hEOOPjexrCBOU7skpkdSPB?usp=sharing
+
+## Output Artifact
+The project output artifact is published on GitHub Releases:
+- https://github.com/saopa28/INSE-6450/releases/tag/v1.0-engineered
 
 ## Dependencies
 Install the required Python packages before running the notebook:
