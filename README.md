@@ -5,7 +5,7 @@ Version control for our group project.
 ## Project overview
 This repository contains a Google Colab/Jupyter notebook for exploratory data analysis on the Criteo uplift dataset. The notebook loads the dataset directly from Hugging Face and performs EDA with [...]
 
-## Google Colab notebook
+## Google Colab Notebook
 - https://colab.research.google.com/drive/1gKct2Ir_g3hEOOPjexrCBOU7skpkdSPB?usp=sharing
 
 ## Dependencies
