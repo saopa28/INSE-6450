@@ -20,8 +20,8 @@ This link will open the notebook directly in Google Colab.
 
 The dataset is large, so running the full project may take significant time:
 
-- Approximately 45 minutes on the free GPU plan
-- Approximately 10 minutes on the paid plan
+- Approximately 1hr45 minutes on the free GPU plan
+- Approximately 20 minutes on the paid plan
 
 ## Existing outputs
 
