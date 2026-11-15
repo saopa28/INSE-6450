@@ -44,14 +44,6 @@ Then run the cells in order from the top. No setup is needed:
 
 The saved model was written with XGBoost 3.4.1. If loading fails on an older version, run `!pip install xgboost==3.4.1` in a cell before the first cell.
 
-## Runtime
-
-Measured on a standard Colab CPU runtime.
-
-| Notebook | Approximate time | Where the time goes |
-|---|---|---|
-| `Monitoring_Adaptation.ipynb` | 20 minutes | Two full retrains of the X-learner, about 6 minutes each. |
-| `Milestone2_Feedback.ipynb` | 2.5 to 3 hours | Tuning four learners (about 35 minutes), twelve final fits over three seeds (about 90 minutes), and the paired bootstrap (about 30 minutes). |
 
 ## Existing outputs
 
