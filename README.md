@@ -8,8 +8,10 @@ The purpose of this repo is to organize and track the project work across the co
 
 Each folder in this repository represents a project milestone, and each milestone contains its own Google Colab notebooks for development and experimentation.
 
-- `Milestone_1/` — first milestone work and notebook(s)
-- `Milestone_2/` — second milestone work and notebook(s)
+- `Milestone_1/` — Data Cleaning & Feature Engineering
+- `Milestone_2/` — Model Training
+- `Milestone 3/` — Model Evaluation
+- `Milestone 4/` — Continual Learning & Final Pipeline
 
 ## Notes
 
