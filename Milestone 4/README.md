@@ -1,12 +1,13 @@
 # Milestone 4: Continual learning, human-in-the-loop, and the final pipeline
 
-This folder holds the final code of the INSE 6450 uplift-modeling project. There are three deliverables:
+This folder holds the final code of the INSE 6450 uplift-modeling project. There are four deliverables:
 
 | Deliverable | Files | What it covers |
 |---|---|---|
 | **1. Full pipeline** | **Code:** `uplift_pipeline/` (package) and `run_pipeline.py` (runs every stage)<br>**Run it in Colab:** `Run_Full_Pipeline.ipynb` (only calls `run_pipeline.py` and shows its results) | Data, model, robustness tests, monitoring, continual learning, human-in-the-loop and active learning, end to end |
 | **2. Demo** | `Demo_End_to_End.ipynb` | One cycle of the deployed system: load → infer → detect drift → query human → update model |
 | **3. Continual-learning simulation (Section 1.4)** | `Continual_Learning_Simulation.ipynb` | Seven drift intervals, four update strategies, five seeds. Part 1: main run (seed 42) with metrics before and after each update, efficiency, plots and saved versions. Part 2: mean ± sd across seeds, how often each strategy was promoted, paired bootstrap on the test split |
+| **4. Active-learning and human-in-the-loop simulations (Section 2.4)** | `Active_learning_and_human_in_the_loop_simulation.ipynb` | Active learning (random vs hybrid query strategy: uncertainty, margin, diversity) and human label curation (random vs targeted review of bot conversions), both with retrain + replay updates and the promotion gate |
 
 `requirements.txt` lists the Python dependencies.
 
@@ -21,7 +22,7 @@ This folder holds the final code of the INSE 6450 uplift-modeling project. There
 | `robustness.py` | Milestone 3 stress tests (noise, rounding, masking, feature loss, +3 sd shift) with the pre-flight check. |
 | `monitoring.py` | Data-quality and drift monitor (schema, nulls, out-of-range rows, PSI per feature) and the Qini retraining trigger. |
 | `continual.py` | Replay buffer (reservoir sampling), update strategies, promotion gate, efficiency measurement (update time, peak memory, latency, size), the simulated drift experiment, and its plots. |
-| `hitl.py` | Human-in-the-loop and active learning (simulated): reviewer for alerts and promotions, uncertainty/random/hybrid query strategies, oracle (randomized experiment on queried users), and the active-learning loop. |
+| `hitl.py` | Human-in-the-loop and active learning (Section 2): simulated reviewer for alerts and promotions, simulated annotator for label corrections, oracle (randomized experiment on the chosen users), the hybrid query strategy (uncertainty, margin, diversity), and the active-learning and label-curation simulations. |
 
 ## How to run
 
@@ -29,6 +30,7 @@ This folder holds the final code of the INSE 6450 uplift-modeling project. There
 
 - Continual learning (Section 1): https://colab.research.google.com/github/saopa28/INSE-6450/blob/main/Milestone%204/Continual_Learning_Simulation.ipynb
 - Demo: https://colab.research.google.com/github/saopa28/INSE-6450/blob/main/Milestone%204/Demo_End_to_End.ipynb
+- Active learning and human-in-the-loop (Section 2): https://colab.research.google.com/github/saopa28/INSE-6450/blob/main/Milestone%204/Active_learning_and_human_in_the_loop_simulation.ipynb
 - Full pipeline: https://colab.research.google.com/github/saopa28/INSE-6450/blob/main/Milestone%204/Run_Full_Pipeline.ipynb
 
 **Command line** (from a clone of the repository):
@@ -43,7 +45,7 @@ python run_pipeline.py --train              # retrain v1 instead of loading the 
 python run_pipeline.py --data path/to/criteo_uplift_engineered.zip
 ```
 
-Approximate times on a Colab CPU runtime with the full data (14 million rows): continual-learning notebook 30-60 minutes (5 seeds), demo 6-10 minutes, full pipeline 25-35 minutes. Peak memory is about 5 GB.
+Approximate times on a Colab CPU runtime with the full data (14 million rows): continual-learning notebook 30-60 minutes (5 seeds), active-learning and human-in-the-loop notebook 30-40 minutes, demo 6-10 minutes, full pipeline about 60 minutes. Peak memory is about 5 GB.
 
 ## Outputs
 
@@ -57,7 +59,8 @@ Everything is written under `outputs/` in the working directory (in Colab, `/con
 | `outputs/continual/seed_<n>/models/<strategy>-step<k>/` | Every promoted model version: four boosters plus `manifest.json`. |
 | `outputs/continual/seeds_summary.csv`, `seeds_bootstrap.csv`, `seeds_update_summary.csv`, `seeds_trajectories.png` | All seeds: mean ± sd per step and strategy, paired bootstrap results, update cost, and the mean ± sd plot. |
 | `outputs/demo/` | Demo comparison table, review log, summary, and the promoted `v2-demo` model. |
-| `outputs/robustness.csv`, `monitoring.csv`, `active_learning.csv`, `active_learning.png`, `pipeline_summary.json` | Results of the other pipeline stages. |
+| `outputs/hitl/` | Section 2.4 notebook: `active_learning.csv`, `active_learning_summary.csv`, `active_learning.png`, `label_curation.csv`, `label_curation_summary.csv`, `label_curation.png`. |
+| `outputs/robustness.csv`, `monitoring.csv`, `active_learning*.csv`/`.png`, `label_curation*.csv`/`.png`, `pipeline_summary.json` | Results of `run_pipeline.py`. |
 
 ## Reproducibility
 

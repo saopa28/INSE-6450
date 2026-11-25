@@ -1,11 +1,12 @@
 """Run the full Milestone 4 pipeline end to end and save every result under outputs/.
 
-    python run_pipeline.py                         # everything, full data (about 25-35 min on Colab CPU)
+    python run_pipeline.py                         # everything, full data (about 45-60 min on Colab CPU)
     python run_pipeline.py --frac 0.1              # quick check on 10% of the rows
     python run_pipeline.py --stages model continual
     python run_pipeline.py --train                 # retrain v1 from scratch instead of loading it
 
-Stages: model (load/train + test metrics), robustness, monitoring, continual, active_learning.
+Stages: model (load/train + test metrics), robustness, monitoring, continual (seed 42),
+active_learning (active-learning and human label-curation simulations of Section 2).
 """
 import argparse
 import json
@@ -74,16 +75,16 @@ def main(argv=None):
         pd.DataFrame([baseline_efficiency(v1, Xte)]).to_csv(out / "continual" / "v1_efficiency.csv", index=False)
 
     if "active_learning" in a.stages:
-        from uplift_pipeline.hitl import active_learning, plot_active_learning
-        sd, rng = raw_sd(Xtr), np.random.default_rng(C.SEED + 1)
-        n_pool = min(500_000, len(ytr) // 4)
-        p = rng.choice(len(ytr), n_pool, replace=False)
-        v = rng.choice(len(yva), min(200_000, len(yva)), replace=False)
-        drift = lambda X: shift(X, sd, 2.0)            # labels are needed where the model is out of date
-        al = active_learning(v1, (drift(Xtr[p]), ttr[p], ytr[p]), (drift(Xva[v]), tva[v], yva[v]),
-                             (drift(Xte), tte, yte), rounds=4, budget=max(n_pool // 20, 1000))
-        al.to_csv(out / "active_learning.csv", index=False)
+        from uplift_pipeline.hitl import active_learning, label_curation, plot_active_learning, plot_label_curation
+        print("[active learning] random vs hybrid query strategy, retrain + replay updates, promotion gate")
+        al, al_summ = active_learning(sp, clf=v1.clf, reg=v1.reg)
+        al.to_csv(out / "active_learning.csv", index=False); al_summ.to_csv(out / "active_learning_summary.csv")
         plot_active_learning(al, out / "active_learning.png")
+        print("[human-in-the-loop] label curation: random vs targeted review of conversions")
+        hc, hc_summ, info = label_curation(sp, clf=v1.clf, reg=v1.reg)
+        hc.to_csv(out / "label_curation.csv", index=False); hc_summ.to_csv(out / "label_curation_summary.csv")
+        plot_label_curation(hc, info, out / "label_curation.png")
+        metrics["label_curation"] = info
 
     metrics["runtime_s"] = round(time.time() - t0, 1)
     (out / "pipeline_summary.json").write_text(json.dumps(metrics, indent=2, default=float))
