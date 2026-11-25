@@ -8,8 +8,7 @@ This folder holds the final code of the INSE 6450 uplift-modeling project: one P
 |---|---|
 | `uplift_pipeline/` | The pipeline package (see the table below). |
 | `run_pipeline.py` | Runs every stage end to end and saves the results under `outputs/`. |
-| `Continual_Learning_Simulation.ipynb` | Section 1.4 experiment: seven drift intervals, four update strategies, metrics before and after each update, efficiency, and plots. |
-| `Continual_Learning_Seeds.ipynb` | The same experiment repeated with seeds 42, 1, 2, 3, 4: mean ± sd of every metric, how often each strategy triggered and was promoted, update cost, and a paired bootstrap on the test split comparing retrain + replay with the alternatives. |
+| `Continual_Learning_Simulation.ipynb` | Section 1.4 experiment: seven drift intervals, four update strategies, run with seeds 42, 1, 2, 3, 4. Part 1 shows the main run (seed 42) in detail: metrics before and after each update, efficiency, plots and saved versions. Part 2 gives mean ± sd across seeds, how often each strategy was promoted, and a paired bootstrap on the test split. |
 | `Demo_End_to_End.ipynb` | Demo of one cycle of the deployed system: load → infer → detect drift → query human → update model. |
 | `Run_Full_Pipeline.ipynb` | Runs `run_pipeline.py` in Colab and displays the saved tables. |
 | `requirements.txt` | Python dependencies. |
@@ -47,7 +46,7 @@ python run_pipeline.py --train              # retrain v1 instead of loading the 
 python run_pipeline.py --data path/to/criteo_uplift_engineered.zip
 ```
 
-Approximate times on a Colab CPU runtime with the full data (14 million rows): continual-learning notebook 15-25 minutes, demo 6-10 minutes, full pipeline 25-35 minutes. Peak memory is about 5 GB.
+Approximate times on a Colab CPU runtime with the full data (14 million rows): continual-learning notebook 30-60 minutes (5 seeds), demo 6-10 minutes, full pipeline 25-35 minutes. Peak memory is about 5 GB.
 
 ## Outputs
 
@@ -55,11 +54,11 @@ Everything is written under `outputs/` in the working directory (in Colab, `/con
 
 | Path | Contents |
 |---|---|
-| `outputs/continual/continual_steps.csv` | One row per drift interval and strategy: PSI, monitor status, trigger, Qini before and after, uplift@10%, retention Qini, gate interval. |
-| `outputs/continual/continual_updates.csv`, `efficiency.csv` | Per promoted update: update time, peak memory, trees, model size, latency (batch 1 and 256), throughput. |
-| `outputs/continual/continual_trajectories.png` | Metric trajectories across the drift intervals and update times. |
-| `outputs/continual/models/<strategy>-step<k>/` | Every promoted model version: four boosters plus `manifest.json`. |
-| `outputs/continual_seeds/` | `seeds_summary.csv` (mean ± sd per step and strategy), `seeds_bootstrap.csv`, `seeds_update_summary.csv`, `seeds_trajectories.png`, and one `seed_<n>/` folder per seed with that run's results and models. |
+| `outputs/continual/seed_<n>/continual_steps.csv` | One row per drift interval and strategy for that seed: PSI, monitor status, trigger, Qini/AUUC/uplift@10% before and after, retention, gate interval. |
+| `outputs/continual/seed_<n>/continual_updates.csv` (and `efficiency.csv` for seed 42) | Per promoted update: update time, peak memory, trees, model size, latency (batch 1 and 256), throughput. |
+| `outputs/continual/seed_42/continual_trajectories.png` | Figure 1.1: metric trajectories of the main run. |
+| `outputs/continual/seed_<n>/models/<strategy>-step<k>/` | Every promoted model version: four boosters plus `manifest.json`. |
+| `outputs/continual/seeds_summary.csv`, `seeds_bootstrap.csv`, `seeds_update_summary.csv`, `seeds_trajectories.png` | All seeds: mean ± sd per step and strategy, paired bootstrap results, update cost, and the mean ± sd plot. |
 | `outputs/demo/` | Demo comparison table, review log, summary, and the promoted `v2-demo` model. |
 | `outputs/robustness.csv`, `monitoring.csv`, `active_learning.csv`, `active_learning.png`, `pipeline_summary.json` | Results of the other pipeline stages. |
 
