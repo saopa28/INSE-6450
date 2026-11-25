@@ -4,7 +4,7 @@ This folder holds the final code of the INSE 6450 uplift-modeling project. There
 
 | Deliverable | Files | What it covers |
 |---|---|---|
-| **1. Full pipeline** | **Code:** `uplift_pipeline/` (package) and `run_pipeline.py` (runs every stage)<br>**Run it in Colab:** `Run_Full_Pipeline.ipynb` (only calls `run_pipeline.py` and shows its results; no code of its own) | Data, model, robustness tests, monitoring, continual learning, human-in-the-loop and active learning, end to end |
+| **1. Full pipeline** | **Code:** `uplift_pipeline/` (package) and `run_pipeline.py` (runs every stage)<br>**Run it in Colab:** `Run_Full_Pipeline.ipynb` (only calls `run_pipeline.py` and shows its results) | Data, model, robustness tests, monitoring, continual learning, human-in-the-loop and active learning, end to end |
 | **2. Demo** | `Demo_End_to_End.ipynb` | One cycle of the deployed system: load → infer → detect drift → query human → update model |
 | **3. Continual-learning simulation (Section 1.4)** | `Continual_Learning_Simulation.ipynb` | Seven drift intervals, four update strategies, five seeds. Part 1: main run (seed 42) with metrics before and after each update, efficiency, plots and saved versions. Part 2: mean ± sd across seeds, how often each strategy was promoted, paired bootstrap on the test split |
 
