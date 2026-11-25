@@ -30,7 +30,7 @@ SCHEDULE = [
 ]
 
 STRATEGIES = {
-    "static": "No update (Milestone 2 model)",
+    "static": "No update (starting model)",
     "retrain_new": "Full retrain on new batch",
     "retrain_replay": "Full retrain on new batch + replay (selected)",
     "warm_replay": "Warm-start + replay",
@@ -121,19 +121,23 @@ def make_update(strategy, deployed, new_tr, new_va, buffer, cfg):
 
 
 def run_simulation(v1, splits, strategies=tuple(STRATEGIES), schedule=SCHEDULE, cfg=None,
-                   out_dir=OUT_DIR / "continual", seed=SEED, log=print, keep_models=False):
+                   out_dir=OUT_DIR / "continual", seed=SEED, log=print, keep_models=False,
+                   stream_idx=None, base_idx=None, base_version="v1"):
     """Simulated drift + continual update experiment. Each step: new labelled rows arrive (drawn from the
     training split, drifted), the deployed model of every strategy is checked (PSI + Qini trigger),
     triggered strategies build a candidate, the promotion gate decides, and every deployed model is
     evaluated on the untouched test split under the step's drift and under the original distribution.
-    With keep_models=True also returns {step: {strategy: deployed model after the step}}."""
+    With keep_models=True also returns {step: {strategy: deployed model after the step}}.
+    stream_idx / base_idx (from fit_base): training-split rows used for the stream and rows the starting model
+    was trained on. Passing them keeps every trigger and gate check on users the starting model never saw."""
     cfg = {**CONTINUAL, **(cfg or {})}
     out_dir = Path(out_dir); (out_dir / "models").mkdir(parents=True, exist_ok=True)
     Xtr, ttr, ytr = splits["train"]; Xva, tva, yva = splits["val"]; Xte, tte, yte = splits["test"]
     sd = Xtr[:, :len(RAW)].std(0)
     rng = np.random.default_rng(seed)
-    order = rng.permutation(len(ytr))
-    rows_step = min(cfg["rows_per_step"], len(ytr) // len(schedule))
+    stream = np.arange(len(ytr)) if stream_idx is None else np.asarray(stream_idx)
+    order = stream[rng.permutation(len(stream))]
+    rows_step = min(cfg["rows_per_step"], len(stream) // len(schedule))
     a, b = int(cfg["split"][0] * rows_step), int((cfg["split"][0] + cfg["split"][1]) * rows_step)
 
     # Qini floor for one trigger window (half of a step's gate rows), from v1 on the clean validation split.
@@ -146,8 +150,10 @@ def run_simulation(v1, splits, strategies=tuple(STRATEGIES), schedule=SCHEDULE, 
 
     buffer = ReplayBuffer(cfg["buffer_size"], Xtr.shape[1], seed)
     deployed = {s: v1 for s in strategies}
-    version = {s: "v1" for s in strategies}
-    monitors = {s: Monitor(Xtr) for s in strategies}
+    version = {s: base_version for s in strategies}
+    ref = Xtr if base_idx is None else Xtr[np.sort(base_idx)]
+    monitors = {s: Monitor(ref) for s in strategies}
+    del ref
     cache, rows, updates, history = {}, [], [], {}
 
     def evaluate(model, vid, k_spec, Xtest):
@@ -226,10 +232,10 @@ def run_simulation(v1, splits, strategies=tuple(STRATEGIES), schedule=SCHEDULE, 
     return (res, upd, history) if keep_models else (res, upd)
 
 
-def baseline_efficiency(model, X):
+def baseline_efficiency(model, X, version="v1"):
     p50_1, p90_1, _ = latency(model, X, 1)
     p50_b, p90_b, thr = latency(model, X, 256)
-    return dict(version="v1", trees_scoring=model.trees()["tau1"] + model.trees()["tau0"],
+    return dict(version=version, trees_scoring=model.trees()["tau1"] + model.trees()["tau0"],
                 trees_total=sum(model.trees().values()), scoring_size_mb=model.size_mb(),
                 p50_ms_b1=p50_1, p90_ms_b1=p90_1, p50_ms_b256=p50_b, p90_ms_b256=p90_b, throughput_rows_s=thr)
 
@@ -269,7 +275,32 @@ def plot_results(res, upd, out_dir=OUT_DIR / "continual"):
 METRICS = ["qini_after", "qini_original", "auuc_after", "uplift10_after"]
 
 
-def run_seeds(v1, splits, seeds=(42, 1, 2, 3, 4), selected="retrain_replay",
+def fit_base(v1, splits, cfg=None, schedule=SCHEDULE, out_dir=OUT_DIR / "continual", seed=SEED, log=print):
+    """Starting model of the simulation (v1-sim): the Milestone 2 X-learner configuration trained on the
+    training-split rows that the stream does not use. The stream then draws only rows this model never saw,
+    so the trigger, the promotion gate and every candidate comparison are out of sample.
+    Returns (model, stream_idx, base_idx)."""
+    cfg = {**CONTINUAL, **(cfg or {})}
+    Xtr, ttr, ytr = splits["train"]
+    perm = np.random.default_rng(seed).permutation(len(ytr))
+    n_stream = min(cfg["rows_per_step"] * len(schedule), (len(ytr) * 3) // 4)
+    stream_idx, base_idx = np.sort(perm[:n_stream]), np.sort(perm[n_stream:])
+    t0 = time.perf_counter()
+    base = XLearner.fit(Xtr[base_idx], ttr[base_idx], ytr[base_idx], *splits["val"], clf=v1.clf, reg=v1.reg)
+    secs = time.perf_counter() - t0
+    Xte, tte, yte = splits["test"]
+    s = base.score(Xte)
+    m = dict(qini=qini(yte, tte, s), auuc=qini(yte, tte, s, auuc=True), uplift10=uplift_at(yte, tte, s, 0.10))
+    base.save(Path(out_dir) / "models" / "v1-sim", version="v1-sim", parent=None, training_rows=len(base_idx),
+              training_seconds=round(secs, 1), test_metrics=m,
+              note="Milestone 2 configuration trained on the training rows the simulated stream does not use")
+    log(f"v1-sim trained on {len(base_idx):,} rows in {secs:.0f} s | stream {len(stream_idx):,} rows | "
+        f"test Qini {m['qini']:.6f}, AUUC {m['auuc']:.6f}, uplift@10% {m['uplift10']:.4f}")
+    return base, stream_idx, base_idx
+
+
+def run_seeds(v1, splits, seeds=(42, 1, 2, 3, 4), selected="retrain_replay", stream_idx=None, base_idx=None,
+              base_version="v1",
               compare=("warm_replay", "retrain_new"), boot_steps=(3, 5, 6), boot_n=200,
               out_dir=OUT_DIR / "continual_seeds", cfg=None, log=print):
     """Repeat the simulation with several seeds (which users fall in each interval, the replay sample and the
@@ -284,7 +315,8 @@ def run_seeds(v1, splits, seeds=(42, 1, 2, 3, 4), selected="retrain_replay",
         log(f"\n================ seed {seed} ({sd_i + 1}/{len(seeds)}) ================")
         t0 = time.perf_counter()
         res, upd, hist = run_simulation(v1, splits, cfg=cfg, out_dir=out_dir / f"seed_{seed}", seed=seed,
-                                        log=log, keep_models=True)
+                                        log=log, keep_models=True, stream_idx=stream_idx, base_idx=base_idx,
+                                        base_version=base_version)
         all_res.append(res.assign(seed=seed)); all_upd.append(upd.assign(seed=seed))
         for step in boot_steps:
             spec = SCHEDULE[step]
