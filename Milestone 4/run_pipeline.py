@@ -69,10 +69,12 @@ def main(argv=None):
         df = pd.DataFrame(rows); df.to_csv(out / "monitoring.csv", index=False); print(df.round(6).to_string())
 
     if "continual" in a.stages:
-        from uplift_pipeline.continual import run_simulation, plot_results, baseline_efficiency
-        res, upd = run_simulation(v1, sp, out_dir=out / "continual")
+        from uplift_pipeline.continual import fit_base, run_simulation, plot_results, baseline_efficiency
+        base, stream_idx, base_idx = fit_base(v1, sp, out_dir=out / "continual")      # starting model v1-sim
+        res, upd = run_simulation(base, sp, out_dir=out / "continual", stream_idx=stream_idx, base_idx=base_idx,
+                                  base_version="v1-sim")
         plot_results(res, upd, out / "continual")
-        pd.DataFrame([baseline_efficiency(v1, Xte)]).to_csv(out / "continual" / "v1_efficiency.csv", index=False)
+        pd.DataFrame([baseline_efficiency(base, Xte, "v1-sim")]).to_csv(out / "continual" / "v1sim_efficiency.csv", index=False)
 
     if "active_learning" in a.stages:
         from uplift_pipeline.hitl import active_learning, label_curation, plot_active_learning, plot_label_curation
