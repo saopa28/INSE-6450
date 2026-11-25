@@ -9,6 +9,7 @@ This folder holds the final code of the INSE 6450 uplift-modeling project: one P
 | `uplift_pipeline/` | The pipeline package (see the table below). |
 | `run_pipeline.py` | Runs every stage end to end and saves the results under `outputs/`. |
 | `Continual_Learning_Simulation.ipynb` | Section 1.4 experiment: seven drift intervals, four update strategies, metrics before and after each update, efficiency, and plots. |
+| `Continual_Learning_Seeds.ipynb` | The same experiment repeated with seeds 42, 1, 2, 3, 4: mean ± sd of every metric, how often each strategy triggered and was promoted, update cost, and a paired bootstrap on the test split comparing retrain + replay with the alternatives. |
 | `Demo_End_to_End.ipynb` | Demo of one cycle of the deployed system: load → infer → detect drift → query human → update model. |
 | `Run_Full_Pipeline.ipynb` | Runs `run_pipeline.py` in Colab and displays the saved tables. |
 | `requirements.txt` | Python dependencies. |
@@ -58,6 +59,7 @@ Everything is written under `outputs/` in the working directory (in Colab, `/con
 | `outputs/continual/continual_updates.csv`, `efficiency.csv` | Per promoted update: update time, peak memory, trees, model size, latency (batch 1 and 256), throughput. |
 | `outputs/continual/continual_trajectories.png` | Metric trajectories across the drift intervals and update times. |
 | `outputs/continual/models/<strategy>-step<k>/` | Every promoted model version: four boosters plus `manifest.json`. |
+| `outputs/continual_seeds/` | `seeds_summary.csv` (mean ± sd per step and strategy), `seeds_bootstrap.csv`, `seeds_update_summary.csv`, `seeds_trajectories.png`, and one `seed_<n>/` folder per seed with that run's results and models. |
 | `outputs/demo/` | Demo comparison table, review log, summary, and the promoted `v2-demo` model. |
 | `outputs/robustness.csv`, `monitoring.csv`, `active_learning.csv`, `active_learning.png`, `pipeline_summary.json` | Results of the other pipeline stages. |
 

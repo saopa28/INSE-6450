@@ -1,5 +1,6 @@
-"""Continual learning (Milestone 4, Section 1): replay buffer, drift-triggered warm-start updates,
-promotion gate, and the simulated drift experiment comparing update strategies."""
+"""Continual learning (Milestone 4, Section 1): replay buffer, drift-triggered updates (selected:
+full retrain on new data + replay; alternatives: retrain on new data only, warm-start boosting + replay),
+promotion gate, and the simulated drift experiment comparing the strategies."""
 import gc
 import json
 import threading
@@ -12,7 +13,7 @@ import psutil
 
 from .config import CONTINUAL, RAW, SEED, OUT_DIR
 from .data import shift
-from .metrics import qini, uplift_at, paired_boot, qini_floor
+from .metrics import qini, uplift_at, paired_boot, qini_floor, paired_boot_fast
 from .model import XLearner
 from .monitoring import Monitor, qini_check
 
@@ -31,8 +32,8 @@ SCHEDULE = [
 STRATEGIES = {
     "static": "No update (Milestone 2 model)",
     "retrain_new": "Full retrain on new batch",
-    "retrain_replay": "Full retrain on new batch + replay",
-    "warm_replay": "Warm-start + replay (selected)",
+    "retrain_replay": "Full retrain on new batch + replay (selected)",
+    "warm_replay": "Warm-start + replay",
 }
 
 
@@ -120,11 +121,12 @@ def make_update(strategy, deployed, new_tr, new_va, buffer, cfg):
 
 
 def run_simulation(v1, splits, strategies=tuple(STRATEGIES), schedule=SCHEDULE, cfg=None,
-                   out_dir=OUT_DIR / "continual", seed=SEED, log=print):
+                   out_dir=OUT_DIR / "continual", seed=SEED, log=print, keep_models=False):
     """Simulated drift + continual update experiment. Each step: new labelled rows arrive (drawn from the
     training split, drifted), the deployed model of every strategy is checked (PSI + Qini trigger),
     triggered strategies build a candidate, the promotion gate decides, and every deployed model is
-    evaluated on the untouched test split under the step's drift and under the original distribution."""
+    evaluated on the untouched test split under the step's drift and under the original distribution.
+    With keep_models=True also returns {step: {strategy: deployed model after the step}}."""
     cfg = {**CONTINUAL, **(cfg or {})}
     out_dir = Path(out_dir); (out_dir / "models").mkdir(parents=True, exist_ok=True)
     Xtr, ttr, ytr = splits["train"]; Xva, tva, yva = splits["val"]; Xte, tte, yte = splits["test"]
@@ -146,7 +148,7 @@ def run_simulation(v1, splits, strategies=tuple(STRATEGIES), schedule=SCHEDULE, 
     deployed = {s: v1 for s in strategies}
     version = {s: "v1" for s in strategies}
     monitors = {s: Monitor(Xtr) for s in strategies}
-    cache, rows, updates = {}, [], []
+    cache, rows, updates, history = {}, [], [], {}
 
     def evaluate(model, vid, k_spec, Xtest):
         key = (vid, k_spec)
@@ -210,6 +212,8 @@ def run_simulation(v1, splits, strategies=tuple(STRATEGIES), schedule=SCHEDULE, 
             rows.append(row)
             log(f"  {s:15s} {vid:22s} PSI {mon['psi_max']:7.3f} | trigger {str(triggered):5s} | "
                 f"Qini current {row['qini_before']:+.6f} -> {row['qini_after']:+.6f} | original {row['qini_original']:+.6f}")
+        if keep_models:
+            history[step] = {s: (deployed[s], version[s]) for s in strategies}
         buffer.add(*new_tr)           # buffer holds past steps only when the next update is made
         del Xs, Xte_cur; gc.collect()
 
@@ -219,7 +223,7 @@ def run_simulation(v1, splits, strategies=tuple(STRATEGIES), schedule=SCHEDULE, 
     upd.to_csv(out_dir / "continual_updates.csv", index=False)
     (out_dir / "continual_config.json").write_text(json.dumps(
         dict(cfg=cfg, schedule=schedule, floor=floor, floor_mean=fmean, floor_sd=fsd, rows_per_step=rows_step), indent=2))
-    return res, upd
+    return (res, upd, history) if keep_models else (res, upd)
 
 
 def baseline_efficiency(model, X):
@@ -259,4 +263,74 @@ def plot_results(res, upd, out_dir=OUT_DIR / "continual"):
         ax[1, 1].set_xticks(names.index); ax[1, 1].set_xticklabels(names.values, rotation=30, ha="right")
         ax[1, 1].legend(fontsize=8)
     fig.tight_layout(); fig.savefig(out_dir / "continual_trajectories.png", dpi=150)
+    return fig
+
+
+METRICS = ["qini_after", "qini_original", "auuc_after", "uplift10_after"]
+
+
+def run_seeds(v1, splits, seeds=(42, 1, 2, 3, 4), selected="retrain_replay",
+              compare=("warm_replay", "retrain_new"), boot_steps=(3, 5, 6), boot_n=200,
+              out_dir=OUT_DIR / "continual_seeds", cfg=None, log=print):
+    """Repeat the simulation with several seeds (which users fall in each interval, the replay sample and the
+    bootstrap resamples change; the test split and XGBoost settings do not). Then, for every seed, compare the
+    selected strategy's deployed model with each alternative on the full test split with a paired bootstrap,
+    at the steps in boot_steps (under that step's drift)."""
+    out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+    Xtr = splits["train"][0]; Xte, tte, yte = splits["test"]
+    sd = Xtr[:, :len(RAW)].std(0)
+    all_res, all_upd, boots = [], [], []
+    for sd_i, seed in enumerate(seeds):
+        log(f"\n================ seed {seed} ({sd_i + 1}/{len(seeds)}) ================")
+        t0 = time.perf_counter()
+        res, upd, hist = run_simulation(v1, splits, cfg=cfg, out_dir=out_dir / f"seed_{seed}", seed=seed,
+                                        log=log, keep_models=True)
+        all_res.append(res.assign(seed=seed)); all_upd.append(upd.assign(seed=seed))
+        for step in boot_steps:
+            spec = SCHEDULE[step]
+            Xs = shift(Xte, sd, spec["k"], spec["cols"])
+            a, va = hist[step][selected]
+            s_a = a.score(Xs)
+            for other in compare:
+                b, vb = hist[step][other]
+                if va == vb:
+                    point, (lo, hi), p = 0.0, (0.0, 0.0), float("nan")
+                else:
+                    point, (lo, hi), p = paired_boot_fast(yte, tte, s_a, b.score(Xs), n=boot_n, seed=seed)
+                boots.append(dict(seed=seed, step=step, drift=spec["name"], selected=va, other=other,
+                                  other_version=vb, qini_gain=point, ci_lo=lo, ci_hi=hi, p_selected_better=p))
+            del Xs
+        del hist; gc.collect()
+        log(f"seed {seed} done in {time.perf_counter() - t0:.0f} s")
+    res, upd, boots = pd.concat(all_res, ignore_index=True), pd.concat(all_upd, ignore_index=True), pd.DataFrame(boots)
+    summ = res.groupby(["step", "drift", "strategy"], sort=False).agg(
+        **{f"{m}_mean": (m, "mean") for m in METRICS}, **{f"{m}_sd": (m, "std") for m in METRICS},
+        seeds_triggered=("triggered", "sum"), seeds_promoted=("promoted", "sum")).reset_index()
+    upd_summ = upd.groupby("strategy").agg(updates=("update_s", "size"), update_s_mean=("update_s", "mean"),
+                                           update_s_sd=("update_s", "std"), peak_rss_mb_mean=("peak_rss_mb", "mean"),
+                                           trees_scoring_mean=("trees_scoring", "mean"), size_mb_mean=("scoring_size_mb", "mean"),
+                                           p50_ms_b1_mean=("p50_ms_b1", "mean"), p50_ms_b256_mean=("p50_ms_b256", "mean")).reset_index() if len(upd) else pd.DataFrame()
+    for name, df in [("seeds_steps", res), ("seeds_summary", summ), ("seeds_updates", upd),
+                     ("seeds_update_summary", upd_summ), ("seeds_bootstrap", boots)]:
+        df.to_csv(out_dir / f"{name}.csv", index=False)
+    return res, summ, upd, upd_summ, boots
+
+
+def plot_seeds(summ, out_dir=OUT_DIR / "continual_seeds"):
+    """Mean +/- one standard deviation across seeds of Qini under the current drift and on the original data."""
+    import matplotlib.pyplot as plt
+    colors = dict(zip(STRATEGIES, ["#7f7f7f", "#1f77b4", "#ff7f0e", "#d62728"]))
+    names = summ.groupby("step").drift.first()
+    fig, ax = plt.subplots(1, 2, figsize=(13, 4.8))
+    for s, g in summ.groupby("strategy", sort=False):
+        for a, m in zip(ax, ["qini_after", "qini_original"]):
+            mu, sdv = g[f"{m}_mean"].values, g[f"{m}_sd"].fillna(0).values
+            a.plot(g.step, mu, "o-", color=colors.get(s), label=STRATEGIES.get(s, s))
+            a.fill_between(g.step, mu - sdv, mu + sdv, color=colors.get(s), alpha=0.15)
+    ax[0].set(title="Qini under the current drift (mean ± sd across seeds)", ylabel="Qini")
+    ax[1].set(title="Qini on the original test data (retention, mean ± sd)", ylabel="Qini")
+    for a in ax:
+        a.axhline(0, c="grey", lw=0.8); a.set_xticks(names.index); a.set_xticklabels(names.values, rotation=30, ha="right")
+    ax[0].legend(fontsize=8)
+    fig.tight_layout(); fig.savefig(Path(out_dir) / "seeds_trajectories.png", dpi=150)
     return fig
