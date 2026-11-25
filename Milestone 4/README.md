@@ -1,17 +1,14 @@
 # Milestone 4: Continual learning, human-in-the-loop, and the final pipeline
 
-This folder holds the final code of the INSE 6450 uplift-modeling project: one Python package that covers every stage from data loading to continual updates, a script that runs the whole pipeline, and three Colab notebooks.
+This folder holds the final code of the INSE 6450 uplift-modeling project. There are three deliverables:
 
-## Contents
+| Deliverable | Files | What it covers |
+|---|---|---|
+| **1. Full pipeline** | **Code:** `uplift_pipeline/` (package) and `run_pipeline.py` (runs every stage)<br>**Run it in Colab:** `Run_Full_Pipeline.ipynb` (only calls `run_pipeline.py` and shows its results; no code of its own) | Data, model, robustness tests, monitoring, continual learning, human-in-the-loop and active learning, end to end |
+| **2. Demo** | `Demo_End_to_End.ipynb` | One cycle of the deployed system: load → infer → detect drift → query human → update model |
+| **3. Continual-learning simulation (Section 1.4)** | `Continual_Learning_Simulation.ipynb` | Seven drift intervals, four update strategies, five seeds. Part 1: main run (seed 42) with metrics before and after each update, efficiency, plots and saved versions. Part 2: mean ± sd across seeds, how often each strategy was promoted, paired bootstrap on the test split |
 
-| File or folder | What it is |
-|---|---|
-| `uplift_pipeline/` | The pipeline package (see the table below). |
-| `run_pipeline.py` | Runs every stage end to end and saves the results under `outputs/`. |
-| `Continual_Learning_Simulation.ipynb` | Section 1.4 experiment: seven drift intervals, four update strategies, run with seeds 42, 1, 2, 3, 4. Part 1 shows the main run (seed 42) in detail: metrics before and after each update, efficiency, plots and saved versions. Part 2 gives mean ± sd across seeds, how often each strategy was promoted, and a paired bootstrap on the test split. |
-| `Demo_End_to_End.ipynb` | Demo of one cycle of the deployed system: load → infer → detect drift → query human → update model. |
-| `Run_Full_Pipeline.ipynb` | Runs `run_pipeline.py` in Colab and displays the saved tables. |
-| `requirements.txt` | Python dependencies. |
+`requirements.txt` lists the Python dependencies.
 
 ### `uplift_pipeline/`
 
@@ -20,7 +17,7 @@ This folder holds the final code of the INSE 6450 uplift-modeling project: one P
 | `config.py` | Seed, data URL, feature lists, Milestone 2 hyperparameters, Milestone 3 monitoring thresholds, Milestone 4 continual-learning settings. All paths are relative. |
 | `data.py` | Loads the engineered Criteo Uplift v2 data, makes the Milestone 2 70/15/15 split (seed 42, stratified on treatment × conversion), and injects drift (shifts raw features and rebuilds the engineered ones). |
 | `metrics.py` | Qini, AUUC, uplift@10%, paired bootstrap of the Qini gain, Qini floor. Same definitions as Milestones 2 and 3. |
-| `model.py` | The X-learner: full training, **warm-start update** (continued boosting from the deployed model), scoring, uncertainty, and versioned save/load with a manifest (parent version, hashes, configuration, metrics). `load_v1()` loads the Milestone 2 model from `../Milestone 3/xlearner_model/` or downloads it. |
+| `model.py` | The X-learner: full training (used by the selected continual-learning update, retrain + replay), warm-start continuation (the alternative compared in Section 1.4), scoring, uncertainty, and versioned save/load with a manifest (parent version, hashes, configuration, metrics). `load_v1()` loads the Milestone 2 model from `../Milestone 3/xlearner_model/` or downloads it. |
 | `robustness.py` | Milestone 3 stress tests (noise, rounding, masking, feature loss, +3 sd shift) with the pre-flight check. |
 | `monitoring.py` | Data-quality and drift monitor (schema, nulls, out-of-range rows, PSI per feature) and the Qini retraining trigger. |
 | `continual.py` | Replay buffer (reservoir sampling), update strategies, promotion gate, efficiency measurement (update time, peak memory, latency, size), the simulated drift experiment, and its plots. |
