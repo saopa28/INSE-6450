@@ -45,7 +45,7 @@ python run_pipeline.py --train              # retrain v1 instead of loading the 
 python run_pipeline.py --data path/to/criteo_uplift_engineered.zip
 ```
 
-Approximate times on a Colab CPU runtime with the full data (14 million rows): continual-learning notebook 50-70 minutes (5 seeds), active-learning and human-in-the-loop notebook 30-40 minutes, demo 6-10 minutes, full pipeline about 60 minutes. Peak memory is about 5 GB.
+Approximate times on a Colab CPU runtime with the full data (14 million rows): continual-learning notebook 40-60 minutes (5 seeds), active-learning and human-in-the-loop notebook 30-40 minutes, demo 6-10 minutes, full pipeline about 60 minutes. Peak memory is about 5 GB.
 
 ## Outputs
 
@@ -71,6 +71,6 @@ Everything is written under `outputs/` in the working directory (in Colab, `/con
 
 ## Notes on the simulation
 
-- The continual-learning simulation starts from **v1-sim**, the Milestone 2 configuration trained on 2.8 million training rows that the stream never uses (`fit_base` in `continual.py`, saved to `outputs/continual/models/v1-sim/`). The stream draws its 7 million rows (disjoint per interval, then drifted) from the rest of the training split, so the trigger and the promotion gate always score models on users they have not seen. All reported metrics use the untouched test split.
+- The continual-learning simulation starts from the Milestone 2 model v1. Its stream of new labelled users is drawn from the training split (disjoint rows per interval, then drifted), which v1 was trained on, so the trigger and the promotion gate score v1 on users it has already seen. This biases them toward keeping v1 (later triggers, more rejections) but not toward any strategy; all reported metrics use the untouched test split. The last cell of the notebook (`RUN_V1SIM_CHECK = True`) and `run_pipeline.py --start v1-sim` repeat the experiment from **v1-sim**, the same configuration trained only on the 2.8 million rows the stream never uses (`fit_base` in `continual.py`). v1-sim barely degrades under these mean shifts, so no update triggers.
 - The demo draws its drifted batch from the validation split, which v1 only used for early stopping.
 - The oracle in the human-in-the-loop code is a randomized experiment on the users the model queries: in the simulation it reveals their logged treatment and conversion, which were randomized in the Criteo data.

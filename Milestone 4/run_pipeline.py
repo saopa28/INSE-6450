@@ -33,6 +33,8 @@ def main(argv=None):
     ap.add_argument("--frac", type=float, default=1.0, help="share of rows to use (default: all)")
     ap.add_argument("--stages", nargs="+", default=STAGES, choices=STAGES)
     ap.add_argument("--train", action="store_true", help="train v1 from scratch with the Milestone 2 configuration")
+    ap.add_argument("--start", default="v1", choices=["v1", "v1-sim"],
+                    help="starting model of the continual-learning stage (v1-sim: trained on rows the stream never uses)")
     ap.add_argument("--out", default=str(C.OUT_DIR))
     a = ap.parse_args(argv)
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
@@ -70,11 +72,15 @@ def main(argv=None):
 
     if "continual" in a.stages:
         from uplift_pipeline.continual import fit_base, run_simulation, plot_results, baseline_efficiency
-        base, stream_idx, base_idx = fit_base(v1, sp, out_dir=out / "continual")      # starting model v1-sim
-        res, upd = run_simulation(base, sp, out_dir=out / "continual", stream_idx=stream_idx, base_idx=base_idx,
-                                  base_version="v1-sim")
+        if a.start == "v1-sim":       # starting model trained only on rows the stream never uses
+            base, stream_idx, base_idx = fit_base(v1, sp, out_dir=out / "continual")
+            res, upd = run_simulation(base, sp, out_dir=out / "continual", stream_idx=stream_idx, base_idx=base_idx,
+                                      base_version="v1-sim")
+        else:                         # Section 1.4 main experiment: starts from the Milestone 2 model v1
+            base = v1
+            res, upd = run_simulation(v1, sp, out_dir=out / "continual")
         plot_results(res, upd, out / "continual")
-        pd.DataFrame([baseline_efficiency(base, Xte, "v1-sim")]).to_csv(out / "continual" / "v1sim_efficiency.csv", index=False)
+        pd.DataFrame([baseline_efficiency(base, Xte, a.start)]).to_csv(out / "continual" / "start_efficiency.csv", index=False)
 
     if "active_learning" in a.stages:
         from uplift_pipeline.hitl import active_learning, label_curation, plot_active_learning, plot_label_curation
